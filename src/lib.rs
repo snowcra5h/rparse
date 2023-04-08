@@ -19,12 +19,15 @@ impl Config {
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents = fs::File::open(config.file_path)?;
+    let file_size: u64 = contents.metadata()?.len();
     let mut reader = std::io::BufReader::new(contents);
-    let mut pe = pe::Pe::new();
+    let mut pe = pe::Pe::new(&mut reader, file_size as usize);
 
-
-    pe.parse_dos_header(&mut reader)?;
+    pe.parse_dos_header()?;
     pe.print_dos_header();
+
+    pe.parse_dos_stub();
+    pe.print_dos_stub();
 
     Ok(())
 }

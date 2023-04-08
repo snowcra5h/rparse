@@ -1,15 +1,25 @@
 use byteorder::{LittleEndian, ReadBytesExt};
-use std::error::Error;
+use std::{
+    error::Error,
+    io::{Cursor, Read},
+};
 use winapi::um::winnt::IMAGE_DOS_HEADER;
 
 pub struct Pe {
+    cursor: Cursor<Vec<u8>>,
     pub dos_header: IMAGE_DOS_HEADER,
-    pub dos_stub: String,
+    pub dos_stub: Vec<u8>,
 }
 
 impl Pe {
-    pub fn new() -> Pe {
+    pub fn new(reader: &mut std::io::BufReader<std::fs::File>, file_size: usize) -> Pe {
         Pe {
+            cursor: {
+                let mut buffer = vec![0; file_size];
+                reader.read_exact(&mut buffer).unwrap();
+                let cursor = Cursor::new(buffer);
+                cursor
+            },
             dos_header: IMAGE_DOS_HEADER {
                 e_magic: 0,
                 e_cblp: 0,
@@ -31,58 +41,57 @@ impl Pe {
                 e_res2: [0; 10],
                 e_lfanew: 0,
             },
-            dos_stub: String::new(),
+            dos_stub: Vec::new(),
         }
     }
 
-    pub fn parse_dos_stub(
-        &mut self,
-        reader: &mut std::io::BufReader<std::fs::File>,
-    ) -> Result<(), Box<dyn Error>> {
-        let mut buf: [u8; 1] = [0; 1];
-        let mut stub: Vec<u8> = Vec::new();
-
-        while reader.read(&mut buf)? > 0 {
-            stub.push(buf[0]);
-        }
-
-        self.dos_stub = String::from_utf8(stub)?;
-
-        Ok(())
+    pub fn parse_dos_stub(&mut self) {
+        let szbuf = self.dos_header.e_lfanew as usize - std::mem::size_of::<IMAGE_DOS_HEADER>();
+        let mut buffer = vec![0; szbuf];
+        self.cursor.read_exact(&mut buffer).unwrap();
+        self.dos_stub = buffer;
     }
 
-    pub fn parse_dos_header(
-        &mut self,
-        reader: &mut std::io::BufReader<std::fs::File>,
-    ) -> Result<(), Box<dyn Error>> {
-        self.dos_header.e_magic = reader.read_u16::<LittleEndian>()?;
+    pub fn print_dos_stub(&self) {
+        println!("DOS Stub:");
+        for i in 0..self.dos_stub.len() {
+            print!("{:02X} ", self.dos_stub[i]);
+            if i % 16 == 15 {
+                println!();
+            }
+        }
+        println!();
+    }
+
+    pub fn parse_dos_header(&mut self) -> Result<(), Box<dyn Error>> {
+        self.dos_header.e_magic = self.cursor.read_u16::<LittleEndian>()?;
 
         if self.dos_header.e_magic != 0x5A4D {
             return Err("Invalid DOS header".into());
         }
 
-        self.dos_header.e_cblp = reader.read_u16::<LittleEndian>()?;
-        self.dos_header.e_cp = reader.read_u16::<LittleEndian>()?;
-        self.dos_header.e_crlc = reader.read_u16::<LittleEndian>()?;
-        self.dos_header.e_cparhdr = reader.read_u16::<LittleEndian>()?;
-        self.dos_header.e_minalloc = reader.read_u16::<LittleEndian>()?;
-        self.dos_header.e_maxalloc = reader.read_u16::<LittleEndian>()?;
-        self.dos_header.e_ss = reader.read_u16::<LittleEndian>()?;
-        self.dos_header.e_sp = reader.read_u16::<LittleEndian>()?;
-        self.dos_header.e_csum = reader.read_u16::<LittleEndian>()?;
-        self.dos_header.e_ip = reader.read_u16::<LittleEndian>()?;
-        self.dos_header.e_cs = reader.read_u16::<LittleEndian>()?;
-        self.dos_header.e_lfarlc = reader.read_u16::<LittleEndian>()?;
-        self.dos_header.e_ovno = reader.read_u16::<LittleEndian>()?;
+        self.dos_header.e_cblp = self.cursor.read_u16::<LittleEndian>()?;
+        self.dos_header.e_cp = self.cursor.read_u16::<LittleEndian>()?;
+        self.dos_header.e_crlc = self.cursor.read_u16::<LittleEndian>()?;
+        self.dos_header.e_cparhdr = self.cursor.read_u16::<LittleEndian>()?;
+        self.dos_header.e_minalloc = self.cursor.read_u16::<LittleEndian>()?;
+        self.dos_header.e_maxalloc = self.cursor.read_u16::<LittleEndian>()?;
+        self.dos_header.e_ss = self.cursor.read_u16::<LittleEndian>()?;
+        self.dos_header.e_sp = self.cursor.read_u16::<LittleEndian>()?;
+        self.dos_header.e_csum = self.cursor.read_u16::<LittleEndian>()?;
+        self.dos_header.e_ip = self.cursor.read_u16::<LittleEndian>()?;
+        self.dos_header.e_cs = self.cursor.read_u16::<LittleEndian>()?;
+        self.dos_header.e_lfarlc = self.cursor.read_u16::<LittleEndian>()?;
+        self.dos_header.e_ovno = self.cursor.read_u16::<LittleEndian>()?;
         for i in 0..4 {
-            self.dos_header.e_res[i] = reader.read_u16::<LittleEndian>()?;
+            self.dos_header.e_res[i] = self.cursor.read_u16::<LittleEndian>()?;
         }
-        self.dos_header.e_oemid = reader.read_u16::<LittleEndian>()?;
-        self.dos_header.e_oeminfo = reader.read_u16::<LittleEndian>()?;
+        self.dos_header.e_oemid = self.cursor.read_u16::<LittleEndian>()?;
+        self.dos_header.e_oeminfo = self.cursor.read_u16::<LittleEndian>()?;
         for i in 0..10 {
-            self.dos_header.e_res2[i] = reader.read_u16::<LittleEndian>()?;
+            self.dos_header.e_res2[i] = self.cursor.read_u16::<LittleEndian>()?;
         }
-        self.dos_header.e_lfanew = reader.read_i32::<LittleEndian>()?;
+        self.dos_header.e_lfanew = self.cursor.read_i32::<LittleEndian>()?;
 
         Ok(())
     }
