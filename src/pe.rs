@@ -4,6 +4,7 @@ use winapi::um::winnt::IMAGE_DOS_HEADER;
 
 pub struct Pe {
     pub dos_header: IMAGE_DOS_HEADER,
+    pub dos_stub: String,
 }
 
 impl Pe {
@@ -30,7 +31,24 @@ impl Pe {
                 e_res2: [0; 10],
                 e_lfanew: 0,
             },
+            dos_stub: String::new(),
         }
+    }
+
+    pub fn parse_dos_stub(
+        &mut self,
+        reader: &mut std::io::BufReader<std::fs::File>,
+    ) -> Result<(), Box<dyn Error>> {
+        let mut buf: [u8; 1] = [0; 1];
+        let mut stub: Vec<u8> = Vec::new();
+
+        while reader.read(&mut buf)? > 0 {
+            stub.push(buf[0]);
+        }
+
+        self.dos_stub = String::from_utf8(stub)?;
+
+        Ok(())
     }
 
     pub fn parse_dos_header(
