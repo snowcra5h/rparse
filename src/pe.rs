@@ -3,12 +3,13 @@ use std::{
     error::Error,
     io::{Cursor, Read},
 };
-use winapi::um::winnt::IMAGE_DOS_HEADER;
+use winapi::um::winnt::{IMAGE_DOS_HEADER, IMAGE_NT_HEADERS};
 
 pub struct Pe {
     cursor: Cursor<Vec<u8>>,
     pub dos_header: IMAGE_DOS_HEADER,
     pub dos_stub: Vec<u8>,
+    pub nt_header: IMAGE_NT_HEADERS,
 }
 
 impl Pe {
@@ -42,6 +43,53 @@ impl Pe {
                 e_lfanew: 0,
             },
             dos_stub: Vec::new(),
+            nt_header: winapi::um::winnt::IMAGE_NT_HEADERS {
+                Signature: 0,
+                FileHeader: winapi::um::winnt::IMAGE_FILE_HEADER {
+                    Machine: 0,
+                    NumberOfSections: 0,
+                    TimeDateStamp: 0,
+                    PointerToSymbolTable: 0,
+                    NumberOfSymbols: 0,
+                    SizeOfOptionalHeader: 0,
+                    Characteristics: 0,
+                },
+                OptionalHeader: winapi::um::winnt::IMAGE_OPTIONAL_HEADER64 {
+                    Magic: 0,
+                    MajorLinkerVersion: 0,
+                    MinorLinkerVersion: 0,
+                    SizeOfCode: 0,
+                    SizeOfInitializedData: 0,
+                    SizeOfUninitializedData: 0,
+                    AddressOfEntryPoint: 0,
+                    BaseOfCode: 0,
+                    ImageBase: 0,
+                    SectionAlignment: 0,
+                    FileAlignment: 0,
+                    MajorOperatingSystemVersion: 0,
+                    MinorOperatingSystemVersion: 0,
+                    MajorImageVersion: 0,
+                    MinorImageVersion: 0,
+                    MajorSubsystemVersion: 0,
+                    MinorSubsystemVersion: 0,
+                    Win32VersionValue: 0,
+                    SizeOfImage: 0,
+                    SizeOfHeaders: 0,
+                    CheckSum: 0,
+                    Subsystem: 0,
+                    DllCharacteristics: 0,
+                    SizeOfStackReserve: 0,
+                    SizeOfStackCommit: 0,
+                    SizeOfHeapReserve: 0,
+                    SizeOfHeapCommit: 0,
+                    LoaderFlags: 0,
+                    NumberOfRvaAndSizes: 0,
+                    DataDirectory: [winapi::um::winnt::IMAGE_DATA_DIRECTORY {
+                        VirtualAddress: 0,
+                        Size: 0,
+                    }; 16],
+                },
+            },
         }
     }
 
